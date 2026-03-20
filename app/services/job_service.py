@@ -7,6 +7,8 @@ from app.sources.base import JobSource, RawJob
 from app.sources.greenhouse import GreenhouseSource
 from app.sources.lever import LeverSource
 
+SUPPORTED_SOURCE_NAMES = ["greenhouse", "lever"]
+
 
 def _apply_company_limit(items: list, company_limit: int | None) -> list:
     if company_limit is None:
@@ -14,23 +16,30 @@ def _apply_company_limit(items: list, company_limit: int | None) -> list:
     return items[:company_limit]
 
 
-def build_sources(source_names: list[str]) -> list[JobSource]:
+def _normalize_company_names(company_names: list[str]) -> set[str]:
+    return {company_name.strip().lower() for company_name in company_names if company_name.strip()}
+
+
+def filter_company_rows(
+    company_rows: list[dict[str, str]],
+    company_names: list[str],
+) -> list[dict[str, str]]:
+    normalized_names = _normalize_company_names(company_names)
+    if not normalized_names:
+        return company_rows
+    return [
+        row
+        for row in company_rows
+        if row.get("company_name", "").strip().lower() in normalized_names
+    ]
+
+
+def build_sources() -> list[JobSource]:
     source_map: dict[str, JobSource] = {
         "greenhouse": GreenhouseSource(),
         "lever": LeverSource(),
     }
-    return [source_map[name] for name in source_names if name in source_map]
-
-
-async def collect_jobs(search: SearchRequest) -> list[RawJob]:
-    jobs: list[RawJob] = []
-    for source in build_sources(search.sources):
-        for company in _apply_company_limit(search.companies, search.company_limit):
-            try:
-                jobs.extend(await source.fetch_jobs(company, search.job_title, search.location))
-            except Exception:
-                continue
-    return jobs
+    return [source_map[name] for name in SUPPORTED_SOURCE_NAMES if name in source_map]
 
 
 async def collect_jobs_from_discovered_targets(
@@ -38,7 +47,7 @@ async def collect_jobs_from_discovered_targets(
     discovered_targets: list[CompanyTarget],
 ) -> list[RawJob]:
     jobs: list[RawJob] = []
-    source_map = {source.name: source for source in build_sources(search.sources)}
+    source_map = {source.name: source for source in build_sources()}
 
     for target in _apply_company_limit(discovered_targets, search.company_limit):
         if not target.source or not target.identifier:
@@ -100,15 +109,13 @@ def _build_job_read(
 async def run_search(search: SearchRequest) -> tuple[list[JobRead], list[str], list[DiscoveredCompany]]:
     merged_keywords = normalize_keywords(search.keywords + search.resume_keywords)
     normalized_search = search.model_copy(update={"keywords": merged_keywords})
-    raw_jobs = await collect_jobs(normalized_search)
-
     discovered_targets: list[CompanyTarget] = []
     if search.company_websites:
         discovered_targets = await discover_company_targets(
             [{"company_name": website, "website_link": website} for website in search.company_websites],
-            allowed_sources=search.sources,
+            allowed_sources=SUPPORTED_SOURCE_NAMES,
         )
-        raw_jobs.extend(await collect_jobs_from_discovered_targets(normalized_search, discovered_targets))
+    raw_jobs = await collect_jobs_from_discovered_targets(normalized_search, discovered_targets)
 
     matched = _build_job_read(raw_jobs, search, merged_keywords)
     discovered_companies = [
@@ -130,8 +137,9 @@ async def run_search_for_company_rows(
 ) -> tuple[list[JobRead], list[str], list[DiscoveredCompany]]:
     merged_keywords = normalize_keywords(search.keywords + search.resume_keywords)
     normalized_search = search.model_copy(update={"keywords": merged_keywords})
-    selected_company_rows = _apply_company_limit(company_rows, search.company_limit)
-    discovered_targets = await discover_company_targets(selected_company_rows, allowed_sources=search.sources)
+    filtered_company_rows = filter_company_rows(company_rows, search.company_names)
+    selected_company_rows = _apply_company_limit(filtered_company_rows, search.company_limit)
+    discovered_targets = await discover_company_targets(selected_company_rows, allowed_sources=SUPPORTED_SOURCE_NAMES)
     raw_jobs = await collect_jobs_from_discovered_targets(normalized_search, discovered_targets)
     matched = _build_job_read(raw_jobs, search, merged_keywords)
     discovered_companies = [

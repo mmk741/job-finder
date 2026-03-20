@@ -6,38 +6,37 @@ Daily job scraper/API for a given company list with filters for location, title,
 
 - `FastAPI` backend
 - Daily scheduler with built-in `asyncio`
-- Source adapters for:
-  - `Greenhouse`
-  - `Lever`
-- Homepage to careers-page discovery from company website URLs
+- Scrapes only from company career pages discovered from company websites
 - Excel upload support for company website lists
 - File-based run storage in `result/runs`
 - Resume keyword extraction for `pdf`, `docx`, and `txt`
-- Saved searches that can run manually or automatically once per day
 
-## Company Inputs Supported
+## Search Source
 
-You can now use either:
+Primary input is the Excel file with:
 
-- `companies`: source-specific slugs
-- `company_websites`: company homepages like `https://www.adobe.com`
-- Excel upload with `Company Name` and `Website Link` columns
+- `Company Name`
+- `Website Link`
+
+Optional user input:
+
+- `company_names`
+  - a list of names like `Adobe`, `Stripe`
+  - if provided, the app only processes those companies from the Excel file
 - optional `company_limit`: only scrape the first `N` companies
 
-If you use `companies`, they should be the source-specific company slug:
-
-- Greenhouse example: `stripe`, `airtable`, `notion`
-- Lever example: `netflix`, `figma`, `coinbase`
-
-If you use `company_websites`, the app will:
+The app will:
 
 1. open the homepage
 2. look for careers/jobs links
 3. follow the careers page
-4. detect whether it is a supported platform
-5. scrape from supported platforms like `Greenhouse` and `Lever`
+4. detect whether it is a supported careers platform
+5. scrape jobs only from that company's careers page flow
 
-If a company uses a custom careers site or Workday, you would add another adapter in `app/sources/`.
+Currently supported careers platforms:
+
+- `Greenhouse`
+- `Lever`
 
 ## Setup
 
@@ -77,43 +76,30 @@ uvicorn app.main:app --reload
 
 ## How To Use
 
-### Use from Excel
+There is one main search flow.
 
 1. Open `http://127.0.0.1:8000/docs`
-2. Open `POST /search/run-from-excel`
+2. Open `POST /search/run`
 3. Click `Try it out`
 4. Upload the Excel file
-5. Fill:
-   - `sources` as `greenhouse,lever`
+5. Upload the resume
+6. Fill optional filters:
+   - `company_names`
    - `location`
    - `job_title`
-   - `keywords` as comma-separated values
-   - `days_recent` as `1` or `2`
-   - `company_limit` for how many companies to process
-   - optional `resume`
-6. Click `Execute`
+   - `keywords`
+   - `days_recent`
+   - `company_limit`
+7. Click `Execute`
 
-### Use from website links
+Notes:
 
-1. Open `POST /search/run`
-2. Click `Try it out`
-3. Paste JSON like:
-
-```json
-{
-  "companies": [],
-  "company_websites": ["https://www.adobe.com", "https://stripe.com"],
-  "sources": ["greenhouse", "lever"],
-  "location": "Bangalore",
-  "job_title": "Software Engineer",
-  "keywords": ["python", "fastapi", "sql"],
-  "days_recent": 2,
-  "company_limit": 10,
-  "resume_keywords": []
-}
-```
-
-4. Click `Execute`
+- `file` is mandatory
+- `resume` is mandatory
+- `company_names` is optional and should be given as a list
+- `keywords` is optional and should be given as a list
+- if `company_names` is empty, the app checks companies from the Excel file
+- the app matches only from company career pages
 
 ### Use resume keyword extraction
 
@@ -122,79 +108,41 @@ uvicorn app.main:app --reload
 3. Click `Execute`
 4. Use the returned keywords in your search
 
-### Use saved searches
-
-1. Open `POST /saved-searches`
-2. Save your search configuration with `is_active: true`
-3. The app will run it daily based on:
-   - `DAILY_RUN_HOUR`
-   - `DAILY_RUN_MINUTE`
-   - `TIMEZONE`
-
 ### Where results are saved
 
 - run files: `result/runs/`
-- saved searches: `result/saved_searches.json`
 
 ## Main Endpoints
 
+- `POST /search/run`
+  - Main search endpoint
+  - Excel file required
+  - Resume required
+  - `company_names` optional list
+  - `keywords` optional list
 - `POST /resume/keywords`
   - Upload a resume and extract likely search keywords.
-- `POST /search/run`
-  - Run a job search using JSON input, including `company_websites`.
-- `POST /search/run-with-resume`
-  - Run a search with form input plus a resume file upload.
-- `POST /search/run-from-excel`
-  - Upload the Excel file and search from homepage URLs automatically.
-  - You can pass `company_limit=10` to scrape only the first 10 companies from the sheet.
-- `POST /saved-searches`
-  - Save a daily search configuration.
-- `POST /saved-searches/{id}/run`
-  - Manually run a saved search.
 - `GET /jobs`
   - See jobs aggregated from saved run files.
+  - By default it shows the current date's results.
+  - Optional query: `date=YYYY-MM-DD`
 
-## Example Search Payload
+## Search Inputs
 
-```json
-{
-  "companies": [],
-  "company_websites": ["https://stripe.com", "https://www.notion.so"],
-  "sources": ["greenhouse", "lever"],
-  "location": "Bangalore",
-  "job_title": "Software Engineer",
-  "keywords": ["python", "fastapi", "sql", "api"],
-  "days_recent": 2,
-  "company_limit": 10,
-  "resume_keywords": ["docker", "aws"]
-}
-```
+Main search endpoint inputs:
 
-You can still use slug-based input:
-
-```json
-{
-  "companies": ["stripe", "notion"],
-  "company_websites": [],
-  "sources": ["greenhouse", "lever"],
-  "location": "Bangalore",
-  "job_title": "Software Engineer",
-  "keywords": ["python", "fastapi", "sql", "api"],
-  "days_recent": 2,
-  "company_limit": 10,
-  "resume_keywords": []
-}
-```
-
-## How Daily Scheduling Works
-
-The app starts one scheduled run every day using:
-
-- `DAILY_RUN_HOUR`
-- `DAILY_RUN_MINUTE`
-- `TIMEZONE`
-
-It executes all active saved searches from `result/saved_searches.json`.
+- `file`
+  - Excel file with `Company Name` and `Website Link`
+- `resume`
+  - mandatory resume file
+- `company_names`
+  - optional list of company names to filter from the Excel file
+- `location`
+- `job_title`
+- `keywords`
+  - optional list
+- `days_recent`
+- `company_limit`
 
 ## File Storage
 
@@ -214,6 +162,15 @@ Each run file contains:
 - simple result items with:
   - `company_name`
   - `job_link`
+
+Run files are created only when at least one matching job is found.
+
+## Viewing Results
+
+- `GET /jobs`
+  - shows only today's results if no date is passed
+  - you can also filter by a specific date
+  - example: `http://127.0.0.1:8000/jobs?date=2026-03-20`
 
 ## Suggested Next Improvements
 

@@ -4,9 +4,8 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class SearchRequest(BaseModel):
-    companies: list[str] = Field(default_factory=list)
+    company_names: list[str] = Field(default_factory=list)
     company_websites: list[str] = Field(default_factory=list)
-    sources: list[str] = Field(default_factory=lambda: ["greenhouse", "lever"])
     location: str = ""
     job_title: str = ""
     keywords: list[str] = Field(default_factory=list)
@@ -16,8 +15,8 @@ class SearchRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_company_inputs(self) -> "SearchRequest":
-        if not self.companies and not self.company_websites:
-            raise ValueError("Provide at least one company slug or company website")
+        if not self.company_websites:
+            raise ValueError("Provide at least one company website")
         return self
 
 

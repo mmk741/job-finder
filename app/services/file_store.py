@@ -1,5 +1,5 @@
 import json
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -104,10 +104,20 @@ def upsert_saved_search(payload: SavedSearchCreate) -> SavedSearchRead:
     return SavedSearchRead.model_validate(created)
 
 
-def list_jobs_from_runs() -> list[JobRead]:
+def list_jobs_from_runs(result_date: date | None = None) -> list[JobRead]:
+    target_date = result_date or datetime.now(UTC).date()
     jobs: list[JobRead] = []
     for run_file in sorted(RUNS_DIR.glob("*.json"), reverse=True):
         payload = _read_json_file(run_file, {})
+        created_at_raw = payload.get("created_at")
+        if not created_at_raw:
+            continue
+        try:
+            created_at = datetime.fromisoformat(created_at_raw.replace("Z", "+00:00")).date()
+        except ValueError:
+            continue
+        if created_at != target_date:
+            continue
         for job in payload.get("jobs", []):
             jobs.append(JobRead.model_validate(job))
     jobs.sort(key=lambda item: (item.score, item.created_at), reverse=True)

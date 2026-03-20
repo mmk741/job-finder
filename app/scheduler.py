@@ -12,9 +12,8 @@ async def run_active_saved_searches() -> None:
     searches = [search for search in list_saved_searches() if search.is_active]
     for saved_search in searches:
         request = SearchRequest(
-            companies=saved_search.companies,
+            company_names=saved_search.company_names,
             company_websites=saved_search.company_websites,
-            sources=saved_search.sources,
             location=saved_search.location,
             job_title=saved_search.job_title,
             keywords=saved_search.keywords,
