@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import HTMLResponse
 
 from app.config import get_settings
 from app.models.schemas import (
@@ -41,6 +42,61 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
+
+
+@app.get("/", response_class=HTMLResponse)
+async def home() -> str:
+    return """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>Job Agent</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.5; }
+            h1, h2 { margin-bottom: 8px; }
+            ul { padding-left: 20px; }
+            a { color: #0b57d0; text-decoration: none; }
+            a:hover { text-decoration: underline; }
+            .card { margin-bottom: 24px; padding: 16px; border: 1px solid #ddd; border-radius: 8px; }
+            code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; }
+        </style>
+    </head>
+    <body>
+        <h1>Job Agent</h1>
+        <p>Use this page to quickly navigate to the main API areas.</p>
+
+        <div class="card">
+            <h2>Main Links</h2>
+            <ul>
+                <li><a href="/docs">Swagger API Docs</a></li>
+                <li><a href="/health">Health Check</a></li>
+                <li><a href="/jobs">All Saved Jobs</a></li>
+                <li><a href="/saved-searches">Saved Searches</a></li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h2>Run Searches</h2>
+            <ul>
+                <li><a href="/docs#/default/run_search_now_search_run_post">Run Search from JSON</a></li>
+                <li><a href="/docs#/default/run_search_with_resume_search_run_with_resume_post">Run Search with Resume</a></li>
+                <li><a href="/docs#/default/run_search_from_excel_search_run_from_excel_post">Run Search from Excel</a></li>
+                <li><a href="/docs#/default/resume_keywords_resume_keywords_post">Extract Resume Keywords</a></li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h2>Saved Search Actions</h2>
+            <ul>
+                <li><a href="/docs#/default/create_saved_search_saved_searches_post">Create or Update Saved Search</a></li>
+                <li><a href="/saved-searches">View Saved Searches</a></li>
+            </ul>
+            <p>To manually run a saved search, open <code>/saved-searches</code>, note the ID, then use the matching action in <a href="/docs">Swagger Docs</a>.</p>
+        </div>
+    </body>
+    </html>
+    """
 
 
 @app.get("/health")
