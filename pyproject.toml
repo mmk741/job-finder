@@ -1,0 +1,6 @@
+[project]
+name = "job-agent"
+version = "0.1.0"
+description = "Daily job scraper with Excel input, careers-page discovery, and file-based run storage."
+requires-python = ">=3.14,<3.15"
+

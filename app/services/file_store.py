@@ -5,14 +5,15 @@ from typing import Any
 
 from app.models.schemas import JobRead, SavedSearchCreate, SavedSearchRead
 
-DATA_DIR = Path("data")
-RUNS_DIR = DATA_DIR / "runs"
-SAVED_SEARCHES_FILE = DATA_DIR / "saved_searches.json"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+RESULT_DIR = PROJECT_ROOT / "result"
+RUNS_DIR = RESULT_DIR / "runs"
+SAVED_SEARCHES_FILE = RESULT_DIR / "saved_searches.json"
 
 
 def init_storage() -> None:
     RUNS_DIR.mkdir(parents=True, exist_ok=True)
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    RESULT_DIR.mkdir(parents=True, exist_ok=True)
     if not SAVED_SEARCHES_FILE.exists():
         SAVED_SEARCHES_FILE.write_text("[]", encoding="utf-8")
 

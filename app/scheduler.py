@@ -1,4 +1,6 @@
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+import asyncio
+from datetime import datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from app.config import get_settings
 from app.models.schemas import SearchRequest
@@ -28,16 +30,52 @@ async def run_active_saved_searches() -> None:
         )
 
 
-def create_scheduler() -> AsyncIOScheduler:
+def _seconds_until_next_run(hour: int, minute: int, timezone_name: str) -> float:
+    timezone = ZoneInfo(timezone_name)
+    now = datetime.now(timezone)
+    next_run = datetime.combine(now.date(), time(hour=hour, minute=minute), tzinfo=timezone)
+    if next_run <= now:
+        next_run += timedelta(days=1)
+    return max((next_run - now).total_seconds(), 1.0)
+
+
+class DailyScheduler:
+    def __init__(self, hour: int, minute: int, timezone_name: str):
+        self.hour = hour
+        self.minute = minute
+        self.timezone_name = timezone_name
+        self._task: asyncio.Task | None = None
+
+    @property
+    def running(self) -> bool:
+        return self._task is not None and not self._task.done()
+
+    async def _runner(self) -> None:
+        while True:
+            await asyncio.sleep(_seconds_until_next_run(self.hour, self.minute, self.timezone_name))
+            try:
+                await run_active_saved_searches()
+            except Exception:
+                # Keep the scheduler alive even if one daily run fails.
+                await asyncio.sleep(1)
+
+    def start(self) -> None:
+        if self.running:
+            return
+        self._task = asyncio.create_task(self._runner(), name="daily-saved-searches")
+
+    def shutdown(self, wait: bool = False) -> None:
+        if not self.running:
+            return
+        assert self._task is not None
+        self._task.cancel()
+
+
+def create_scheduler() -> DailyScheduler:
     settings = get_settings()
-    scheduler = AsyncIOScheduler(timezone=settings.timezone)
-    scheduler.add_job(
-        run_active_saved_searches,
-        trigger="cron",
+    return DailyScheduler(
         hour=settings.daily_run_hour,
         minute=settings.daily_run_minute,
-        id="daily-saved-searches",
-        replace_existing=True,
+        timezone_name=settings.timezone,
     )
-    return scheduler
 

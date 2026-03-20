@@ -5,7 +5,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "Job Agent"
-    database_url: str = "sqlite:///./jobs.db"
     request_timeout_seconds: int = 30
     user_agent: str = "job-agent/0.1"
     scheduler_enabled: bool = True

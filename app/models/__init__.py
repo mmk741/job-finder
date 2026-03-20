@@ -1,2 +1,2 @@
-"""Database and API models."""
+"""API and data models."""
 

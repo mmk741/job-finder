@@ -5,13 +5,13 @@ Daily job scraper/API for a given company list with filters for location, title,
 ## What This MVP Includes
 
 - `FastAPI` backend
-- Daily scheduler with `APScheduler`
+- Daily scheduler with built-in `asyncio`
 - Source adapters for:
   - `Greenhouse`
   - `Lever`
 - Homepage to careers-page discovery from company website URLs
 - Excel upload support for company website lists
-- File-based run storage in `data/runs`
+- File-based run storage in `result/runs`
 - Resume keyword extraction for `pdf`, `docx`, and `txt`
 - Saved searches that can run manually or automatically once per day
 
@@ -41,6 +41,8 @@ If a company uses a custom careers site or Workday, you would add another adapte
 
 ## Setup
 
+Recommended runtime: `Python 3.14.3`
+
 ```powershell
 cd D:\personal\job-agent
 python -m venv .venv
@@ -51,6 +53,88 @@ uvicorn app.main:app --reload
 ```
 
 Open the API docs at `http://127.0.0.1:8000/docs`.
+
+## How To Run
+
+### First time
+
+```powershell
+cd D:\personal\job-agent
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+copy env.example .env
+uvicorn app.main:app --reload
+```
+
+### Next time
+
+```powershell
+cd D:\personal\job-agent
+.venv\Scripts\activate
+uvicorn app.main:app --reload
+```
+
+## How To Use
+
+### Use from Excel
+
+1. Open `http://127.0.0.1:8000/docs`
+2. Open `POST /search/run-from-excel`
+3. Click `Try it out`
+4. Upload the Excel file
+5. Fill:
+   - `sources` as `greenhouse,lever`
+   - `location`
+   - `job_title`
+   - `keywords` as comma-separated values
+   - `days_recent` as `1` or `2`
+   - `company_limit` for how many companies to process
+   - optional `resume`
+6. Click `Execute`
+
+### Use from website links
+
+1. Open `POST /search/run`
+2. Click `Try it out`
+3. Paste JSON like:
+
+```json
+{
+  "companies": [],
+  "company_websites": ["https://www.adobe.com", "https://stripe.com"],
+  "sources": ["greenhouse", "lever"],
+  "location": "Bangalore",
+  "job_title": "Software Engineer",
+  "keywords": ["python", "fastapi", "sql"],
+  "days_recent": 2,
+  "company_limit": 10,
+  "resume_keywords": []
+}
+```
+
+4. Click `Execute`
+
+### Use resume keyword extraction
+
+1. Open `POST /resume/keywords`
+2. Upload a `pdf`, `docx`, or text resume
+3. Click `Execute`
+4. Use the returned keywords in your search
+
+### Use saved searches
+
+1. Open `POST /saved-searches`
+2. Save your search configuration with `is_active: true`
+3. The app will run it daily based on:
+   - `DAILY_RUN_HOUR`
+   - `DAILY_RUN_MINUTE`
+   - `TIMEZONE`
+
+### Where results are saved
+
+- run files: `result/runs/`
+- saved searches: `result/saved_searches.json`
 
 ## Main Endpoints
 
@@ -110,15 +194,17 @@ The app starts one scheduled run every day using:
 - `DAILY_RUN_MINUTE`
 - `TIMEZONE`
 
-It executes all active saved searches from `data/saved_searches.json`.
+It executes all active saved searches from `result/saved_searches.json`.
 
 ## File Storage
 
 Each search run is saved as a JSON file:
 
 ```text
-data/runs/2026-03-20-search-001.json
+result/runs/2026-03-20-search-001.json
 ```
+
+Storage is resolved from the project root, so results are always saved inside this `job-agent` project even if you start the app from another directory.
 
 Each run file contains:
 
