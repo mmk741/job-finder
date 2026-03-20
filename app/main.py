@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from datetime import date
+import logging
 
 from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import HTMLResponse
@@ -20,6 +21,12 @@ from app.services.file_store import (
 )
 from app.services.job_service import run_search_for_company_rows
 from app.services.resume_parser import extract_keywords_from_upload
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 scheduler = create_scheduler()
@@ -107,21 +114,31 @@ async def run_search_now(
     days_recent: int = Form(2),
     company_limit: int | None = Form(None),
 ) -> RunSearchResponse:
-    company_rows: list[dict[str, str]] = []
+    file_company_rows: list[dict[str, str]] = []
     if file is not None:
-        company_rows = await extract_company_rows_from_excel(file)
-        if not company_rows:
+        file_company_rows = await extract_company_rows_from_excel(file)
+        if not file_company_rows:
             raise HTTPException(status_code=400, detail="Could not read company rows from the Excel file")
 
     provided_company_urls = [item.strip() for item in (company_urls or []) if item and item.strip()]
-    if not company_rows and not provided_company_urls:
+    if not file_company_rows and not provided_company_urls:
         raise HTTPException(status_code=400, detail="Provide either an Excel file or at least one company URL")
 
+    company_rows: list[dict[str, str]] = []
     if provided_company_urls:
         company_rows.extend(
             {"company_name": url, "website_link": url}
             for url in provided_company_urls
         )
+    company_rows.extend(file_company_rows)
+
+    effective_company_limit = len(provided_company_urls) if provided_company_urls else company_limit
+    logger.info(
+        "Starting search with %s direct company URL(s), %s Excel company row(s), effective company_limit=%s",
+        len(provided_company_urls),
+        len(file_company_rows),
+        effective_company_limit,
+    )
 
     resume_keywords, _ = await extract_keywords_from_upload(resume)
     request = SearchRequest(
@@ -131,7 +148,7 @@ async def run_search_now(
         job_title=job_title,
         keywords=keywords or [],
         days_recent=days_recent,
-        company_limit=company_limit,
+        company_limit=effective_company_limit,
         resume_keywords=resume_keywords,
     )
     jobs, keywords_used, discovered_companies = await run_search_for_company_rows(request, company_rows)

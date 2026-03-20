@@ -103,7 +103,9 @@ Notes:
 - `company_urls` is optional and should be given as a list
 - `keywords` is optional and should be given as a list
 - if `company_names` is empty, the app checks all provided companies
+- if `company_urls` is provided, the effective company count follows the number of URLs you passed
 - the app matches only from company career pages
+- homepage and careers-page attempts are logged in the server console
 
 ### Use resume keyword extraction
 
