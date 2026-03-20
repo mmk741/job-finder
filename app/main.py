@@ -97,8 +97,9 @@ async def resume_keywords(file: UploadFile = File(...)) -> ResumeKeywordsRespons
 
 @app.post("/search/run", response_model=RunSearchResponse)
 async def run_search_now(
-    file: UploadFile = File(...),
+    file: UploadFile | None = File(None),
     resume: UploadFile = File(...),
+    company_urls: list[str] | None = Form(None),
     company_names: list[str] | None = Form(None),
     location: str = Form(""),
     job_title: str = Form(""),
@@ -106,9 +107,21 @@ async def run_search_now(
     days_recent: int = Form(2),
     company_limit: int | None = Form(None),
 ) -> RunSearchResponse:
-    company_rows = await extract_company_rows_from_excel(file)
-    if not company_rows:
-        raise HTTPException(status_code=400, detail="Could not read company rows from the Excel file")
+    company_rows: list[dict[str, str]] = []
+    if file is not None:
+        company_rows = await extract_company_rows_from_excel(file)
+        if not company_rows:
+            raise HTTPException(status_code=400, detail="Could not read company rows from the Excel file")
+
+    provided_company_urls = [item.strip() for item in (company_urls or []) if item and item.strip()]
+    if not company_rows and not provided_company_urls:
+        raise HTTPException(status_code=400, detail="Provide either an Excel file or at least one company URL")
+
+    if provided_company_urls:
+        company_rows.extend(
+            {"company_name": url, "website_link": url}
+            for url in provided_company_urls
+        )
 
     resume_keywords, _ = await extract_keywords_from_upload(resume)
     request = SearchRequest(

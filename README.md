@@ -81,10 +81,13 @@ There is one main search flow.
 1. Open `http://127.0.0.1:8000/docs`
 2. Open `POST /search/run`
 3. Click `Try it out`
-4. Upload the Excel file
+4. Provide either:
+   - an Excel file, or
+   - `company_urls` as a list
 5. Upload the resume
 6. Fill optional filters:
    - `company_names`
+   - `company_urls`
    - `location`
    - `job_title`
    - `keywords`
@@ -94,11 +97,12 @@ There is one main search flow.
 
 Notes:
 
-- `file` is mandatory
+- provide either `file` or `company_urls`
 - `resume` is mandatory
 - `company_names` is optional and should be given as a list
+- `company_urls` is optional and should be given as a list
 - `keywords` is optional and should be given as a list
-- if `company_names` is empty, the app checks companies from the Excel file
+- if `company_names` is empty, the app checks all provided companies
 - the app matches only from company career pages
 
 ### Use resume keyword extraction
@@ -116,9 +120,12 @@ Notes:
 
 - `POST /search/run`
   - Main search endpoint
-  - Excel file required
+  - Excel file optional
+  - company URL list optional
+  - at least one of them is required
   - Resume required
   - `company_names` optional list
+  - `company_urls` optional list
   - `keywords` optional list
 - `POST /resume/keywords`
   - Upload a resume and extract likely search keywords.
@@ -132,7 +139,11 @@ Notes:
 Main search endpoint inputs:
 
 - `file`
-  - Excel file with `Company Name` and `Website Link`
+  - optional Excel file with `Company Name` and `Website Link`
+- `company_urls`
+  - optional list of company URLs
+- one of `file` or `company_urls`
+  - required
 - `resume`
   - mandatory resume file
 - `company_names`
